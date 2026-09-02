@@ -46,9 +46,20 @@ stubs.
 (1) the confirm-handler itself must check current availability with real
 concurrency control — this is what actually prevents overselling; (2)
 publishing `AvailabilityChanged` to Service Bus afterward is what lets
-`Lakbay.SearchApi`/`Lakbay.Web` reflect it live — see
+`Lakbay.AvailabilityApi`/`Lakbay.Web` reflect it live — see
 [ADR-0008](../Lakbay.Docs/docs/adr/ADR-0008-realtime-availability-propagation.md).
 (2) happening fast does not substitute for (1) being correct.
+
+**(1), concretely — [ADR-0011](../Lakbay.Docs/docs/adr/ADR-0011-atomic-availability-decrement.md):**
+`ConfirmBookingCommandHandler` must issue a single atomic, conditional SQL
+`UPDATE` (`SET AvailableCount = AvailableCount - 1 WHERE AvailableCount > 0`)
+and check rows-affected — **never** a `SELECT` to check availability
+followed by a separate `UPDATE`/`INSERT`. That read-then-write shape is
+exactly what lets two near-simultaneous bookings both succeed for the
+same slot. Any PR touching this handler needs the concurrency test
+described in `02_BUILD_PLAN.md` Phase 4 (two simulated simultaneous
+confirms against `AvailableCount = 1`, exactly one succeeds) before it
+can be considered done.
 
 ## Local setup
 
