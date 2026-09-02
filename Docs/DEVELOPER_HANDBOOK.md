@@ -31,6 +31,17 @@ service boots. Real scope (CQRS command/query handlers per ADR-0002, the
 atomic availability decrement per ADR-0011, PayMongo integration) is
 Phase 4, and needs SQL Server (ADR-0005) once that's set up.
 
+**When Phase 4 needs a database:** don't stand up a separate SQL Server
+container for this repo. `../Lakbay.Cms/docker-compose.yml` already runs
+one shared local SQL Server instance (Developer Edition) that creates
+both `umbracoDb` and `lakbayBookingDb` on first start (see
+`../Lakbay.Cms/Database/setup.sql`) — two fully separate databases
+(ADR-0003), one container for local-dev convenience. Run
+`docker compose up -d` from `Lakbay.Cms`, then point this repo's own
+connection string (via `dotnet user-secrets`, not `appsettings.json` —
+same reasoning as `Lakbay.Cms`'s handbook) at
+`Server=localhost,1433;Database=lakbayBookingDb;...`.
+
 ## Adding a new MediatR handler — worked walkthrough (once Phase 4 starts)
 
 Not applicable yet — no MediatR reference exists in this project as of
