@@ -42,6 +42,14 @@ with both read and write methods on it, stop and re-read the ADR — that
 exact shape is what made `E-Commerse.AI.API`'s controllers unmaintainable
 stubs.
 
+**Two separate jobs when a booking is confirmed, don't conflate them:**
+(1) the confirm-handler itself must check current availability with real
+concurrency control — this is what actually prevents overselling; (2)
+publishing `AvailabilityChanged` to Service Bus afterward is what lets
+`Lakbay.SearchApi`/`Lakbay.Web` reflect it live — see
+[ADR-0008](../Lakbay.Docs/docs/adr/ADR-0008-realtime-availability-propagation.md).
+(2) happening fast does not substitute for (1) being correct.
+
 ## Local setup
 
 Not yet proven — Phase 0 is not complete. Once the minimal API + xUnit
