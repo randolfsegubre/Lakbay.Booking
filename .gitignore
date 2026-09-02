@@ -1,0 +1,16 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+appsettings.*.local.json
+
+## OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+## Local secrets — never commit
+*.env
+.env.local
