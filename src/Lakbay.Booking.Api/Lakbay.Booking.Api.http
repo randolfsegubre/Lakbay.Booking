@@ -1,0 +1,6 @@
+@Lakbay.Booking.Api_HostAddress = http://localhost:5263
+
+GET {{Lakbay.Booking.Api_HostAddress}}/health
+Accept: application/json
+
+###
