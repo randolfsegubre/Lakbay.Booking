@@ -1,6 +1,38 @@
+using System.Text.Json.Serialization;
+using Lakbay.Booking.Api.Api;
+using Lakbay.Booking.Api.Application.Commands;
+using Lakbay.Booking.Api.Application.Queries;
+using Lakbay.Booking.Api.Infrastructure;
+using Lakbay.Booking.Api.Payments;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+
+// So a curl body can send "channel": "Agent" instead of a raw enum index.
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+
+// ADR-0005: SQL Server locally (LocalDB by default here — see
+// appsettings.json's "BookingDb" connection string; swapping to the
+// platform's shared Docker SQL Server / lakbayBookingDb, or to Azure SQL
+// in a real environment, is a connection-string-only change), never
+// Azure SQL Database for local dev.
+builder.Services.AddDbContext<BookingDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("BookingDb")));
+
+// ADR-0002: MediatR — separate command/query handlers, never a shared
+// "BookingService" class with both read and write methods on it.
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
+
+// Strategy pattern (03_ARCHITECTURE_AND_PATTERNS_GUIDE.md): the Online
+// channel depends on the interface, not on PayMongo directly. Real
+// implementation is still blocked on a sandbox account (ADR-0026).
+builder.Services.AddScoped<IPaymentGateway, PayMongoPaymentGateway>();
 
 var app = builder.Build();
 
@@ -11,11 +43,47 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Phase 0: proves the service boots. Real endpoints (CQRS command/query
-// handlers per ADR-0002, the atomic availability decrement per ADR-0011)
-// land in Phase 4 — see Lakbay.Docs/docs/02_BUILD_PLAN.md.
+// Phase 4/7 exit criteria (ADR-0002, ADR-0026): prove the DI graph
+// actually resolves and the database is actually reachable, not just
+// that the classes compile — migrate + seed on startup.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+    await db.Database.MigrateAsync();
+    await AvailabilitySeeder.SeedAsync(db);
+}
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "Lakbay.Booking" }))
     .WithName("HealthCheck");
+
+app.MapPost("/api/bookings/confirm", async (ConfirmBookingRequest request, IMediator mediator, CancellationToken cancellationToken) =>
+{
+    var command = new ConfirmBookingCommand(request.ProductId, request.DateSlot, request.CustomerId, request.Channel);
+    var result = await mediator.Send(command, cancellationToken);
+
+    return result.Status switch
+    {
+        ConfirmBookingStatus.Confirmed => Results.Ok(new
+        {
+            bookingId = result.BookingId,
+            paymentStatus = result.PaymentStatus!.Value.ToString(),
+            message = result.Message
+        }),
+        ConfirmBookingStatus.NotAvailable => Results.Conflict(new { message = result.Message }),
+        ConfirmBookingStatus.PaymentGatewayNotImplemented => Results.Json(
+            new { message = result.Message },
+            statusCode: StatusCodes.Status501NotImplemented),
+        _ => Results.Problem("Unexpected confirm-booking result.")
+    };
+})
+.WithName("ConfirmBooking");
+
+app.MapGet("/api/bookings/{id:guid}", async (Guid id, IMediator mediator, CancellationToken cancellationToken) =>
+{
+    var booking = await mediator.Send(new GetBookingByIdQuery(id), cancellationToken);
+    return booking is null ? Results.NotFound() : Results.Ok(booking);
+})
+.WithName("GetBookingById");
 
 app.Run();
 
