@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.83.0" />
     <PackageReference Include="MediatR" Version="12.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
@@ -18,6 +19,16 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Lakbay.Contracts\csharp\Lakbay.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ADR-0027: server-side generated code for the Agent Channel's gRPC
+         confirm-booking call. "Both" (not "Server") so
+         Lakbay.Booking.Tests can drive a real client stub against this
+         same assembly via ProjectReference without generating a second,
+         colliding copy of the message types in the test project itself -
+         production code (Program.cs) only ever uses the server side. -->
+    <Protobuf Include="Protos\bookingconfirm.proto" GrpcServices="Both" />
   </ItemGroup>
 
 </Project>

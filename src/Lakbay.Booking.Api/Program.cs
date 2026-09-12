@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Lakbay.Booking.Api.Api;
 using Lakbay.Booking.Api.Application.Commands;
 using Lakbay.Booking.Api.Application.Queries;
+using Lakbay.Booking.Api.Grpc;
 using Lakbay.Booking.Api.Infrastructure;
 using Lakbay.Booking.Api.Payments;
 using MediatR;
@@ -10,6 +11,11 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+
+// ADR-0027: Agent Channel confirm-booking call. Additive alongside the
+// existing REST endpoints below — Lakbay.Web's online checkout keeps
+// using REST; only Lakbay.AgentOps calls this.
+builder.Services.AddGrpc();
 
 // So a curl body can send "channel": "Agent" instead of a raw enum index.
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -55,6 +61,10 @@ using (var scope = app.Services.CreateScope())
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "Lakbay.Booking" }))
     .WithName("HealthCheck");
+
+// ADR-0027: Agent Channel only, reached via Lakbay.AgentOps's gRPC client
+// (Grpc.Net.Client), never by a browser or Lakbay.Web directly.
+app.MapGrpcService<BookingConfirmGrpcService>();
 
 app.MapPost("/api/bookings/confirm", async (ConfirmBookingRequest request, IMediator mediator, CancellationToken cancellationToken) =>
 {
