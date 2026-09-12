@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <!-- ADR-0027: drives a real gRPC channel/client against the
+         BookingConfirmService.BookingConfirmServiceClient generated inside
+         Lakbay.Booking.Api itself (GrpcServices="Both") - no separate
+         codegen needed here. -->
+    <PackageReference Include="Grpc.Net.Client" Version="2.83.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
